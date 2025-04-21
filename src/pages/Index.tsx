@@ -5,6 +5,8 @@ import {
   ArrowRight, BookOpen, Award, Brain, Code, Play, Trophy, 
   Sparkles, Zap, Rocket, Star
 } from "lucide-react";
+import { Buffer } from 'buffer';
+window.Buffer = Buffer;
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";

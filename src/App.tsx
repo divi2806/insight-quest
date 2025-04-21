@@ -17,6 +17,8 @@ import UserProfile from "./pages/UserProfile";
 import ContestsPage from "./pages/ContestsPage";
 import BusinessPage from "./pages/BusinessPage";
 import MarketplacePage from "./pages/MarketplacePage";
+import { Buffer } from 'buffer';
+window.Buffer = Buffer;
 
 const queryClient = new QueryClient();
 

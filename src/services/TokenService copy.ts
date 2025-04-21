@@ -7,7 +7,6 @@ import {
   createAssociatedTokenAccountInstruction
 } from '@solana/spl-token';
 import bs58 from 'bs58';
-import { Buffer } from 'buffer';
 
 // Token mint address on Solana devnet
 const TOKEN_MINT_ADDRESS = 'FGn3YwW5iMDe2Sz7ekYTV8ZvAdmQmzeSGpFEsAjHEQnm';
@@ -22,50 +21,50 @@ const getConnection = () => {
 const TokenService = {
   // Get token balance for a user
   async getTokenBalance(walletAddress: string): Promise<number> {
+    try {
+      console.log('Environment:', process.env.NODE_ENV); // Check environment
+      console.log('Getting token balance for:', walletAddress);
+      const connection = getConnection();
+      console.log('Connection established to:', connection.rpcEndpoint);
+      
+      const walletPublicKey = new PublicKey(walletAddress);
+      const mintPublicKey = new PublicKey(TOKEN_MINT_ADDRESS);
+      console.log('Using token mint:', TOKEN_MINT_ADDRESS);
+      
+      const tokenAccountAddress = await getAssociatedTokenAddress(
+        mintPublicKey,
+        walletPublicKey
+      );
+      console.log('Token account address:', tokenAccountAddress.toString());
+      
       try {
-        console.log('Environment:', process.env.NODE_ENV); // Check environment
-        console.log('Getting token balance for:', walletAddress);
-        const connection = getConnection();
-        console.log('Connection established to:', connection.rpcEndpoint);
+        // Test connection with a simple RPC call
+        const blockHeight = await connection.getBlockHeight();
+        console.log('Current block height:', blockHeight);
         
-        const walletPublicKey = new PublicKey(walletAddress);
-        const mintPublicKey = new PublicKey(TOKEN_MINT_ADDRESS);
-        console.log('Using token mint:', TOKEN_MINT_ADDRESS);
+        // Get token account
+        const tokenAccount = await getAccount(connection, tokenAccountAddress);
+        console.log('Token account found:', tokenAccount.address.toString());
         
-        const tokenAccountAddress = await getAssociatedTokenAddress(
-          mintPublicKey,
-          walletPublicKey
-        );
-        console.log('Token account address:', tokenAccountAddress.toString());
+        const mintInfo = await getMint(connection, mintPublicKey);
+        console.log('Mint decimals:', mintInfo.decimals);
         
-        try {
-          // Test connection with a simple RPC call
-          const blockHeight = await connection.getBlockHeight();
-          console.log('Current block height:', blockHeight);
-          
-          // Get token account
-          const tokenAccount = await getAccount(connection, tokenAccountAddress);
-          console.log('Token account found:', tokenAccount.address.toString());
-          
-          const mintInfo = await getMint(connection, mintPublicKey);
-          console.log('Mint decimals:', mintInfo.decimals);
-          
-          const balance = Number(tokenAccount.amount) / Math.pow(10, mintInfo.decimals);
-          console.log('Calculated balance:', balance);
-          return balance;
-        } catch (error) {
-          console.log('Token account error:', error);
-          // Check if account actually exists regardless of error
-          const accountInfo = await connection.getAccountInfo(tokenAccountAddress);
-          console.log('Account exists check:', accountInfo !== null);
-          
-          return 0;
-        }
+        const balance = Number(tokenAccount.amount) / Math.pow(10, mintInfo.decimals);
+        console.log('Calculated balance:', balance);
+        return balance;
       } catch (error) {
-        console.error('Fatal error getting token balance:', error);
+        console.log('Token account error:', error);
+        // Check if account actually exists regardless of error
+        const accountInfo = await connection.getAccountInfo(tokenAccountAddress);
+        console.log('Account exists check:', accountInfo !== null);
+        
         return 0;
       }
-    },
+    } catch (error) {
+      console.error('Fatal error getting token balance:', error);
+      return 0;
+    }
+  },
   
   // Check if a user has an associated token account
   async hasTokenAccount(walletAddress: string): Promise<boolean> {

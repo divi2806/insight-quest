@@ -9,7 +9,7 @@ import { saveUser, getUser, updateUserXP } from '@/services/firebase';
 import LevelUpDialog from '@/components/notifications/LevelUpDialog';
 import TokenService from '../lib/tokenContract';
 import { User } from '@/types';
-
+import { Buffer } from 'buffer';
 // Import the styles for the wallet adapter instead of using require
 import '@solana/wallet-adapter-react-ui/styles.css';
 
