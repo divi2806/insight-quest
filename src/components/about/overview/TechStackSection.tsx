@@ -47,7 +47,7 @@ const TechStackSection = () => {
               </div>
               <h3 className="text-xl font-semibold mb-2">Blockchain</h3>
               <p className="text-gray-400 mb-4">
-                Ethereum-based with ethers.js for Web3 interaction and Solidity smart contracts
+                Sol.js for Web3 interaction in solana and anchor smart contracts
               </p>
             </CardContent>
           </Card>
@@ -59,7 +59,7 @@ const TechStackSection = () => {
               </div>
               <h3 className="text-xl font-semibold mb-2">Authentication</h3>
               <p className="text-gray-400 mb-4">
-                Web3 authentication with MetaMask for secure wallet-based identity verification
+                Web3 authentication with Phantom and Solana Supported Wallets for secure wallet-based identity verification
               </p>
             </CardContent>
           </Card>
