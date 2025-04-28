@@ -23,7 +23,7 @@ const TokenomicsSection = () => {
                   </div>
                   <div className="flex justify-between border-b border-gray-800 pb-2">
                     <span className="text-gray-400">Type</span>
-                    <span className="font-medium">ERC-20</span>
+                    <span className="font-medium">SOLANA SPL TOKENS</span>
                   </div>
                   <div className="flex justify-between border-b border-gray-800 pb-2">
                     <span className="text-gray-400">Total Supply</span>
@@ -38,7 +38,7 @@ const TokenomicsSection = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between border-b border-gray-800 pb-2">
                     <span className="text-gray-400">Network</span>
-                    <span className="font-medium">Sepolia / Ethereum (Later)</span>
+                    <span className="font-medium">Solana Devnet/Mainnet (LATER)</span>
                   </div>
                   <div className="flex justify-between border-b border-gray-800 pb-2">
                     <span className="text-gray-400">Initial Distribution</span>
