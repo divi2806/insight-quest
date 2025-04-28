@@ -1,13 +1,17 @@
-
+// pages/leaderboard.tsx
 import { useState, useEffect } from "react";
 import { 
-  Trophy, 
+  Trophy,
+  Code,
+  Video,
+  BookOpen, 
   Award, 
   Search,
   Clock,
   CircleDollarSign,
   SortAsc,
-  SortDesc
+  SortDesc,
+  Users
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -20,6 +24,7 @@ import MainLayout from "@/components/layout/MainLayout";
 import { generateMockLeaderboard } from "@/lib/mockData";
 import { LeaderboardEntry } from "@/types";
 import { shortenAddress } from "@/lib/web3Utils";
+import UserDetailsDialog from "@/components/UserDetailsDialog";
 
 const Leaderboard = () => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -29,10 +34,12 @@ const Leaderboard = () => {
     key: "tokensEarned",
     direction: "desc" as "asc" | "desc"
   });
+  const [selectedUser, setSelectedUser] = useState<LeaderboardEntry | null>(null);
+  const [userDetailsOpen, setUserDetailsOpen] = useState(false);
 
   useEffect(() => {
-    // Load the leaderboard data
-    const mockLeaderboard = generateMockLeaderboard();
+    // Load the leaderboard data with enhanced mock data
+    const mockLeaderboard = generateEnhancedMockLeaderboard();
     setLeaderboard(mockLeaderboard);
     setFilteredLeaderboard(mockLeaderboard);
   }, []);
@@ -79,6 +86,41 @@ const Leaderboard = () => {
       direction: prevConfig.key === key && prevConfig.direction === "desc" ? "asc" : "desc"
     }));
   };
+  
+  const handleUserClick = (user: LeaderboardEntry) => {
+    setSelectedUser(user);
+    setUserDetailsOpen(true);
+  };
+  
+  // Generate enhanced mock data with more details
+  const generateEnhancedMockLeaderboard = (): LeaderboardEntry[] => {
+    const baseLeaderboard = generateMockLeaderboard();
+    
+    // Add more detailed information to each entry
+    return baseLeaderboard.map(entry => {
+      // Use address as a seed for consistent randomization
+      const seed = entry.address.charCodeAt(2) + entry.address.charCodeAt(5);
+      
+      // Generate random activity breakdown with some correlation to user's level
+      // Higher level users tend to have more activity
+      const levelFactor = entry.level / 50; // 0-1 scale based on level
+      
+      return {
+        ...entry,
+        // Add additional fields for the enhanced leaderboard
+        activityBreakdown: {
+          leetcode: Math.floor(Math.random() * 30 * (0.5 + levelFactor)),
+          videos: Math.floor(Math.random() * 20 * (0.5 + levelFactor)),
+          courses: Math.floor(Math.random() * 10 * (0.5 + levelFactor)),
+          contests: Math.floor(Math.random() * 5 * (0.5 + levelFactor)),
+          agents: Math.floor(Math.random() * 3 * (0.5 + levelFactor))
+        },
+        joinDate: new Date(2024, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1).toISOString(),
+        lastActive: new Date(2025, 3, Math.floor(Math.random() * 20) + 1).toISOString(),
+        streak: Math.floor(Math.random() * 30) + 1,
+      };
+    });
+  };
 
   return (
     <MainLayout>
@@ -94,7 +136,8 @@ const Leaderboard = () => {
             {filteredLeaderboard.slice(0, 3).map((entry, index) => (
               <div 
                 key={index} 
-                className={`glass-card rounded-lg p-6 text-center ${index === 0 ? "purple-glow" : ""}`}
+                className={`glass-card rounded-lg p-6 text-center ${index === 0 ? "purple-glow" : ""} cursor-pointer hover:bg-brand-purple/10 transition-colors`}
+                onClick={() => handleUserClick(entry)}
               >
                 <div className="mb-4 flex justify-center">
                   <div className="relative">
@@ -137,6 +180,31 @@ const Leaderboard = () => {
                 <div className="flex items-center justify-center gap-2 text-lg font-bold text-yellow-400">
                   <Award className="h-5 w-5" />
                   <span>{entry.tokensEarned}</span>
+                </div>
+                
+                {/* Activity breakdown preview */}
+                <div className="mt-4 pt-4 border-t border-brand-purple/10">
+                  <div className="text-xs text-gray-400 mb-2">Token Sources</div>
+                  <div className="flex justify-center space-x-3">
+                    <div className="flex flex-col items-center">
+                      <div className="h-6 w-6 rounded-full bg-blue-500/20 flex items-center justify-center mb-1">
+                        <Code className="h-3 w-3 text-blue-500" />
+                      </div>
+                      <span className="text-xs">{entry.activityBreakdown?.leetcode || 0}</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <div className="h-6 w-6 rounded-full bg-red-500/20 flex items-center justify-center mb-1">
+                        <Video className="h-3 w-3 text-red-500" />
+                      </div>
+                      <span className="text-xs">{entry.activityBreakdown?.videos || 0}</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <div className="h-6 w-6 rounded-full bg-yellow-500/20 flex items-center justify-center mb-1">
+                        <Trophy className="h-3 w-3 text-yellow-500" />
+                      </div>
+                      <span className="text-xs">{entry.activityBreakdown?.contests || 0}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -237,13 +305,15 @@ const Leaderboard = () => {
                       )}
                     </Button>
                   </th>
+                  <th className="py-3 px-4 text-center">Activity</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredLeaderboard.map((entry) => (
                   <tr 
                     key={entry.address} 
-                    className="border-b border-brand-purple/10 hover:bg-brand-purple/5"
+                    className="border-b border-brand-purple/10 hover:bg-brand-purple/5 cursor-pointer"
+                    onClick={() => handleUserClick(entry)}
                   >
                     <td className="py-4 px-4">
                       <div className="flex items-center">
@@ -302,12 +372,36 @@ const Leaderboard = () => {
                         <span className="font-medium">{entry.tasksCompleted}</span>
                       </div>
                     </td>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center justify-center space-x-2">
+                        {entry.activityBreakdown?.leetcode > 0 && (
+                          <div className="h-6 w-6 rounded-full bg-blue-500/20 flex items-center justify-center" title="LeetCode">
+                            <Code className="h-3 w-3 text-blue-500" />
+                          </div>
+                        )}
+                        {entry.activityBreakdown?.videos > 0 && (
+                          <div className="h-6 w-6 rounded-full bg-red-500/20 flex items-center justify-center" title="Videos">
+                            <Video className="h-3 w-3 text-red-500" />
+                          </div>
+                        )}
+                        {entry.activityBreakdown?.courses > 0 && (
+                          <div className="h-6 w-6 rounded-full bg-green-500/20 flex items-center justify-center" title="Courses">
+                            <BookOpen className="h-3 w-3 text-green-500" />
+                          </div>
+                        )}
+                        {entry.activityBreakdown?.contests > 0 && (
+                          <div className="h-6 w-6 rounded-full bg-yellow-500/20 flex items-center justify-center" title="Contests">
+                            <Trophy className="h-3 w-3 text-yellow-500" />
+                          </div>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
                 
                 {filteredLeaderboard.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-gray-400">
+                    <td colSpan={7} className="py-8 text-center text-gray-400">
                       No users found matching your search
                     </td>
                   </tr>
@@ -317,6 +411,13 @@ const Leaderboard = () => {
           </div>
         </div>
       </div>
+      
+      {/* User Details Dialog */}
+      <UserDetailsDialog 
+        user={selectedUser}
+        open={userDetailsOpen}
+        onOpenChange={setUserDetailsOpen}
+      />
     </MainLayout>
   );
 };

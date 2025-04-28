@@ -86,7 +86,7 @@ const ZappyChat = () => {
             const welcomeMessage: ChatMessage = {
               userId: user.id,
               sender: "zappy",
-              content: "Hello! I'm Zappy, your InsightQuest AI assistant. I can help you learn about blockchain, TaskFi, $TASK tokens, and guide you through completing tasks to earn rewards. How can I help you today? 🤖✨",
+              content: "Hello! I'm Zappy, your TASK-fi AI assistant. I can help you learn about blockchain, get all details you require as a young founder who wants a defined path, TaskFi, $TASK tokens, and guide you through completing tasks to earn rewards. How can I help you today? 🤖✨",
               timestamp: new Date().toISOString()
             };
             
@@ -226,7 +226,7 @@ const ZappyChat = () => {
             </Avatar>
             <div>
               <h2 className="font-bold text-lg">Zappy AI</h2>
-              <p className="text-sm text-gray-400">Your InsightQuest Assistant</p>
+              <p className="text-sm text-gray-400">Your TASK-fi Assistant</p>
             </div>
           </div>
           

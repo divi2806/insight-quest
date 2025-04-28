@@ -10,7 +10,22 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Download, Github, Star, Users, Clock, Tag, ExternalLink, Trash2, AlertCircle } from "lucide-react";
+import { 
+  Download, 
+  Github, 
+  Star, 
+  Users, 
+  Clock, 
+  Tag, 
+  ExternalLink, 
+  Trash2, 
+  AlertCircle,
+  MessageCircle,
+  MapPin,
+  Calendar,
+  Award,
+  Mail
+} from "lucide-react";
 import { Agent } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 import { useWeb3 } from "@/contexts/Web3Context";
@@ -47,6 +62,7 @@ const AgentDetailsDialog = ({ agent, open, onOpenChange, onDelete }: AgentDetail
   const isPurchased = user?.address && agent.purchasedBy?.includes(user.address);
   const isCreator = user?.id && agent.creatorId === user.id;
   const createdDate = new Date(agent.dateCreated);
+  const isHumanAgent = agent.agentType === 'human';
 
   const handleDeleteAgent = async () => {
     if (!agent.id) return;
@@ -139,79 +155,140 @@ const AgentDetailsDialog = ({ agent, open, onOpenChange, onDelete }: AgentDetail
             </div>
             
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Features</h3>
-                <ul className="space-y-2">
-                  <li className="flex items-start gap-2">
-                    <div className="rounded-full p-1 bg-green-500/10 text-green-500 mt-0.5">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                    <span>Advanced machine learning algorithms</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <div className="rounded-full p-1 bg-green-500/10 text-green-500 mt-0.5">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                    <span>Regular updates and improvements</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <div className="rounded-full p-1 bg-green-500/10 text-green-500 mt-0.5">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                    <span>Easy integration with your workflow</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <div className="rounded-full p-1 bg-green-500/10 text-green-500 mt-0.5">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                    <span>Detailed documentation and support</span>
-                  </li>
-                </ul>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Technical Details</h3>
-                <div className="space-y-3">
-                  {agent.githubUrl && (
-                    <div className="flex items-center gap-2">
-                      <Github className="w-4 h-4 text-gray-400" />
-                      <a href={agent.githubUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 hover:underline flex items-center">
-                        GitHub Repository <ExternalLink className="w-3 h-3 ml-1" />
-                      </a>
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    <p className="text-sm text-gray-400">Compatibility</p>
-                    <Progress value={98} className="h-2" />
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>All InsightQuest Platforms</span>
-                      <span>98%</span>
+              {isHumanAgent ? (
+                // Human Agent Details
+                <>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Service Details</h3>
+                    <ul className="space-y-3">
+                      {agent.experience && (
+                        <li className="flex items-start gap-2">
+                          <Clock className="w-4 h-4 text-gray-400 mt-0.5" />
+                          <span><span className="font-medium">Experience:</span> {agent.experience}</span>
+                        </li>
+                      )}
+                      {agent.location && (
+                        <li className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
+                          <span><span className="font-medium">Location:</span> {agent.location}</span>
+                        </li>
+                      )}
+                      {agent.availability && (
+                        <li className="flex items-start gap-2">
+                          <Calendar className="w-4 h-4 text-gray-400 mt-0.5" />
+                          <span><span className="font-medium">Availability:</span> {agent.availability}</span>
+                        </li>
+                      )}
+                      {agent.contactMethod && (
+                        <li className="flex items-start gap-2">
+                          <MessageCircle className="w-4 h-4 text-gray-400 mt-0.5" />
+                          <span><span className="font-medium">Contact Method:</span> {agent.contactMethod}</span>
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Qualifications</h3>
+                    {agent.qualifications && agent.qualifications.length > 0 ? (
+                      <ul className="space-y-2">
+                        {agent.qualifications.map((qualification, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <Award className="w-4 h-4 text-gray-400 mt-0.5" />
+                            <span>{qualification}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-gray-500">No specific qualifications listed.</p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                // AI Agent Details
+                <>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Features</h3>
+                    <ul className="space-y-2">
+                      <li className="flex items-start gap-2">
+                        <div className="rounded-full p-1 bg-green-500/10 text-green-500 mt-0.5">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                        <span>Advanced machine learning algorithms</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <div className="rounded-full p-1 bg-green-500/10 text-green-500 mt-0.5">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                        <span>Regular updates and improvements</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <div className="rounded-full p-1 bg-green-500/10 text-green-500 mt-0.5">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                        <span>Easy integration with your workflow</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <div className="rounded-full p-1 bg-green-500/10 text-green-500 mt-0.5">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                        <span>Detailed documentation and support</span>
+                      </li>
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Technical Details</h3>
+                    <div className="space-y-3">
+                      {agent.githubUrl && (
+                        <div className="flex items-center gap-2">
+                          <Github className="w-4 h-4 text-gray-400" />
+                          <a href={agent.githubUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 hover:underline flex items-center">
+                            GitHub Repository <ExternalLink className="w-3 h-3 ml-1" />
+                          </a>
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-400">Compatibility</p>
+                        <Progress value={98} className="h-2" />
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>All InsightQuest Platforms</span>
+                          <span>98%</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-400">Performance</p>
+                        <Progress value={85} className="h-2" />
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>Response time</span>
+                          <span>85%</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-sm text-gray-400">Performance</p>
-                    <Progress value={85} className="h-2" />
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>Response time</span>
-                      <span>85%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
             
             <div className="mt-8 flex gap-4 flex-wrap">
               {isPurchased ? (
                 <Button className="flex-1 bg-green-600 hover:bg-green-700">
-                  <Download className="mr-2 h-4 w-4" /> Download
+                  {isHumanAgent ? (
+                    <>
+                      <MessageCircle className="mr-2 h-4 w-4" /> Contact
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" /> Download
+                    </>
+                  )}
                 </Button>
               ) : !isCreator ? (
                 <Button 
@@ -222,10 +299,18 @@ const AgentDetailsDialog = ({ agent, open, onOpenChange, onDelete }: AgentDetail
                 </Button>
               ) : null}
               
-              {agent.githubUrl && (
+              {!isHumanAgent && agent.githubUrl && (
                 <Button variant="outline" asChild>
                   <a href={agent.githubUrl} target="_blank" rel="noopener noreferrer">
                     <Github className="mr-2 h-4 w-4" /> View Source
+                  </a>
+                </Button>
+              )}
+              
+              {isHumanAgent && (
+                <Button variant="outline" asChild>
+                  <a href={`mailto:contact@example.com?subject=Inquiry about ${agent.name}`}>
+                    <Mail className="mr-2 h-4 w-4" /> Send Inquiry
                   </a>
                 </Button>
               )}
@@ -267,7 +352,11 @@ const AgentDetailsDialog = ({ agent, open, onOpenChange, onDelete }: AgentDetail
                         </div>
                       </div>
                       <p className="text-sm text-gray-400 mt-1">
-                        {[
+                        {isHumanAgent ? [
+                          "Very professional service, exceeded my expectations. Highly recommended!",
+                          "Excellent communication and expertise. Delivered exactly what my startup needed.",
+                          "Great value for the price. Would definitely hire again for future projects."
+                        ][idx] : [
                           "This agent has been incredibly helpful for my workflow. Highly recommended!",
                           "Excellent tool that saved me hours of work. The integration is seamless.",
                           "Great value for the price. Would definitely buy from this creator again."
@@ -298,7 +387,7 @@ const AgentDetailsDialog = ({ agent, open, onOpenChange, onDelete }: AgentDetail
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-red-500" />
-              Delete AI Agent
+              Delete {isHumanAgent ? 'Human' : 'AI'} Agent
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete <span className="font-medium">{agent.name}</span>? This action cannot be undone and will remove the agent from the marketplace.

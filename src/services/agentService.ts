@@ -1,57 +1,86 @@
 import firebaseService from './firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc, query, where, getDoc, updateDoc, writeBatch, setDoc } from 'firebase/firestore';
-import { mockAgents } from '../lib/mockAgents'; // Adjust the import path as needed
+import { collection, addDoc, getDocs, deleteDoc, doc, query, where, getDoc, updateDoc, writeBatch, setDoc, CollectionReference, Query, DocumentData } from 'firebase/firestore';
+import { mockAgents } from '../lib/mockAgents';
+import { mockHumanAgents } from '../lib/mockHumanAgents';
+import { Agent } from '@/types';
 
 const AGENTS_COLLECTION = 'agents';
 const { db } = firebaseService;
 
-// Get all agents
-export const getAllAgents = async () => {
+// Get all agents with optional type filter
+export const getAllAgents = async (agentType?: 'ai' | 'human') => {
   try {
     const agentsCollection = collection(db, AGENTS_COLLECTION);
-    const agentSnapshot = await getDocs(agentsCollection);
+    let agentQuery: Query<DocumentData>;
+    
+    // If agentType is specified, filter by it
+    if (agentType) {
+      agentQuery = query(agentsCollection, where("agentType", "==", agentType));
+    } else {
+      agentQuery = query(agentsCollection);
+    }
+    
+    const agentSnapshot = await getDocs(agentQuery);
+    
     // If no agents in Firestore, load mock data
     if (agentSnapshot.empty) {
       console.log("No agents found in Firestore. Loading mock data...");
       await loadMockAgents();
       // Get agents again after loading mock data
-      const newSnapshot = await getDocs(agentsCollection);
+      const newSnapshot = await getDocs(agentQuery);
       return newSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as Agent[];
     }
+    
     return agentSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
-    }));
+    })) as Agent[];
   } catch (error) {
     console.error("Error getting agents:", error);
     return [];
   }
 };
+
 // Load mock agents into Firestore
 export const loadMockAgents = async () => {
   try {
     const batch = writeBatch(db);
     const agentsRef = collection(db, AGENTS_COLLECTION);
+    
     // Check if agents collection already has data
     const agentSnapshot = await getDocs(query(agentsRef));
     if (!agentSnapshot.empty) {
       console.log("Agents collection already has data. Skipping mock data load.");
       return;
     }
-    // Add each mock agent to Firestore
-    const addPromises = mockAgents.map(agent => {
+    
+    // Add each mock AI agent to Firestore
+    const aiAddPromises = mockAgents.map(agent => {
       const { id, ...agentWithoutId } = agent;
       const docRef = doc(agentsRef, id);
       return setDoc(docRef, {
         ...agentWithoutId,
-        purchasedBy: [] // Ensure purchasedBy is initialized
+        purchasedBy: agentWithoutId.purchasedBy || [],
+        agentType: 'ai' // Ensure AI type is set
       });
     });
-    await Promise.all(addPromises);
-    console.log(`Successfully loaded ${mockAgents.length} mock agents into Firestore.`);
+    
+    // Add each mock human agent to Firestore
+    const humanAddPromises = mockHumanAgents.map(agent => {
+      const { id, ...agentWithoutId } = agent;
+      const docRef = doc(agentsRef, id);
+      return setDoc(docRef, {
+        ...agentWithoutId,
+        purchasedBy: agentWithoutId.purchasedBy || [],
+        agentType: 'human' // Ensure human type is set
+      });
+    });
+    
+    await Promise.all([...aiAddPromises, ...humanAddPromises]);
+    console.log(`Successfully loaded ${mockAgents.length + mockHumanAgents.length} mock agents into Firestore.`);
     return true;
   } catch (error) {
     console.error("Error loading mock agents:", error);
@@ -59,12 +88,17 @@ export const loadMockAgents = async () => {
   }
 };
 
-// Add a new agent - now with better error handling
-export const addAgent = async (agentData) => {
+// Add a new agent - now with better error handling and agentType support
+export const addAgent = async (agentData: Partial<Agent>) => {
   try {
     // Validate that there is a creatorId before proceeding
     if (!agentData.creatorId) {
       throw new Error("Creator ID is required to add an agent");
+    }
+    
+    // Validate agentType
+    if (!agentData.agentType || !['ai', 'human'].includes(agentData.agentType)) {
+      throw new Error("Valid agent type (ai or human) is required");
     }
     
     const agentsRef = collection(db, AGENTS_COLLECTION);
@@ -82,8 +116,8 @@ export const addAgent = async (agentData) => {
     // Return the complete agent with its new ID
     return {
       id: docRef.id,
-      ...agentWithTimestamp
-    };
+      ...agentWithTimestamp as object
+    } as Agent;
   } catch (error) {
     console.error("Error adding agent:", error);
     throw error; // Re-throw to handle in the component
@@ -91,7 +125,7 @@ export const addAgent = async (agentData) => {
 };
 
 // Delete an agent
-export const deleteAgent = async (agentId) => {
+export const deleteAgent = async (agentId: string) => {
   try {
     // Check if wallet is connected - similar to your checkWalletAuth() function in firebase.ts
     const walletAddress = localStorage.getItem('connectedAddress');
@@ -124,15 +158,25 @@ export const deleteAgent = async (agentId) => {
 };
 
 // Get agents by creator ID
-export const getAgentsByCreator = async (creatorId) => {
+export const getAgentsByCreator = async (creatorId: string, agentType?: 'ai' | 'human') => {
   try {
     const agentsRef = collection(db, AGENTS_COLLECTION);
-    const q = query(agentsRef, where("creatorId", "==", creatorId));
+    let q: Query<DocumentData>;
+    
+    if (agentType) {
+      q = query(agentsRef, 
+        where("creatorId", "==", creatorId),
+        where("agentType", "==", agentType)
+      );
+    } else {
+      q = query(agentsRef, where("creatorId", "==", creatorId));
+    }
+    
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
-    }));
+    })) as Agent[];
   } catch (error) {
     console.error("Error getting creator's agents:", error);
     return [];
@@ -140,7 +184,7 @@ export const getAgentsByCreator = async (creatorId) => {
 };
 
 // Purchase an agent
-export const purchaseAgent = async (agentId, userId) => {
+export const purchaseAgent = async (agentId: string, userId: string) => {
   try {
     const agentRef = doc(db, AGENTS_COLLECTION, agentId);
     const agentDoc = await getDoc(agentRef);
@@ -186,15 +230,15 @@ export const initializeFirestore = async () => {
 };
 
 // Get an agent by ID
-export const getAgentById = async (agentId) => {
+export const getAgentById = async (agentId: string) => {
   try {
     const agentRef = doc(db, AGENTS_COLLECTION, agentId);
     const agentDoc = await getDoc(agentRef);
     if (agentDoc.exists()) {
       return {
         id: agentDoc.id,
-        ...agentDoc.data()
-      };
+        ...agentDoc.data() as object
+      } as Agent;
     }
     return null;
   } catch (error) {
@@ -204,24 +248,70 @@ export const getAgentById = async (agentId) => {
 };
 
 // Get agents by category
-export const getAgentsByCategory = async (category) => {
+export const getAgentsByCategory = async (category: string, agentType?: 'ai' | 'human') => {
   try {
     const agentsRef = collection(db, AGENTS_COLLECTION);
-    const q = query(agentsRef, where("category", "==", category));
+    let q: Query<DocumentData>;
+    
+    if (agentType) {
+      q = query(agentsRef, 
+        where("category", "==", category),
+        where("agentType", "==", agentType)
+      );
+    } else {
+      q = query(agentsRef, where("category", "==", category));
+    }
+    
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data()
-    }));
+      ...doc.data() as object
+    })) as Agent[];
   } catch (error) {
     console.error("Error getting agents by category:", error);
     return [];
   }
 };
 
+// Get agents by type (AI or human)
+export const getAgentsByType = async (agentType: 'ai' | 'human') => {
+  try {
+    const agentsRef = collection(db, AGENTS_COLLECTION);
+    const q = query(agentsRef, where("agentType", "==", agentType));
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as object
+    })) as Agent[];
+  } catch (error) {
+    console.error(`Error getting ${agentType} agents:`, error);
+    return [];
+  }
+};
+
 // Update agent's purchased by field (legacy function, kept for compatibility)
-export const updateAgentPurchase = async (agentId, buyerId) => {
+export const updateAgentPurchase = async (agentId: string, buyerId: string) => {
   return purchaseAgent(agentId, buyerId);
+};
+
+// Search agents by name, description or category
+export const searchAgents = async (searchTerm: string, agentType?: 'ai' | 'human') => {
+  try {
+    // Get all agents (optionally filtered by type)
+    const agents = await getAllAgents(agentType);
+    
+    // Filter by search term (client-side search)
+    const searchTermLower = searchTerm.toLowerCase();
+    return agents.filter(agent => 
+      agent.name.toLowerCase().includes(searchTermLower) ||
+      agent.description.toLowerCase().includes(searchTermLower) ||
+      agent.category.toLowerCase().includes(searchTermLower)
+    );
+  } catch (error) {
+    console.error("Error searching agents:", error);
+    return [];
+  }
 };
 
 export default {
@@ -234,5 +324,7 @@ export default {
   loadMockAgents,
   initializeFirestore,
   getAgentById,
-  getAgentsByCategory
+  getAgentsByCategory,
+  getAgentsByType,
+  searchAgents
 };

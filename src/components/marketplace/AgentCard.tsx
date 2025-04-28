@@ -1,9 +1,11 @@
+// components/AgentCard.tsx
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Star, Tag, Info, Trash2, Download, Coins, Loader2 } from "lucide-react";
+import { Star, Tag, Info, Trash2, Download, Coins, Loader2, Calendar, MapPin, Clock, MessageCircle } from "lucide-react";
 import { Agent } from "@/types";
 import { useWeb3 } from "@/contexts/Web3Context";
 import PurchaseAgentDialog from "./PurchaseAgentDialog";
@@ -24,6 +26,7 @@ import {
 interface AgentCardProps {
   agent: Agent;
   onDelete: (agentId: string) => void;
+  agentType?: 'ai' | 'human';
 }
 
 const AgentCard: React.FC<AgentCardProps> = ({ agent, onDelete }) => {
@@ -35,6 +38,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onDelete }) => {
 
   const isPurchased = user?.address && agent.purchasedBy?.includes(user.address);
   const isCreator = user?.id === agent.creatorId;
+  const isHumanAgent = agent.agentType === 'human';
 
   const handleDeleteClick = async () => {
     setIsDeleting(true);
@@ -96,6 +100,23 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onDelete }) => {
           <p className="text-sm text-gray-600 line-clamp-2 h-10">
             {agent.description}
           </p>
+          
+          {/* Display human agent specific info if it's a human agent */}
+          {isHumanAgent && agent.experience && (
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center text-xs text-gray-500">
+                <Clock className="h-3 w-3 mr-1" />
+                <span>Experience: {agent.experience}</span>
+              </div>
+              {agent.location && (
+                <div className="flex items-center text-xs text-gray-500">
+                  <MapPin className="h-3 w-3 mr-1" />
+                  <span>{agent.location}</span>
+                </div>
+              )}
+            </div>
+          )}
+          
           <div className="flex items-center justify-between mt-3">
             <div className="flex items-center">
               {Array.from({ length: 5 }).map((_, index) => (
@@ -128,8 +149,17 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onDelete }) => {
           </Button>
           {isPurchased ? (
             <Button className="w-1/2 purple-gradient">
-              <Download className="h-4 w-4 mr-2" />
-              Download
+              {isHumanAgent ? (
+                <>
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Contact
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </>
+              )}
             </Button>
           ) : !isCreator && (
             <Button
@@ -149,7 +179,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onDelete }) => {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete your agent "{agent.name}" from the marketplace.
+              This will permanently delete your {agent.agentType} agent "{agent.name}" from the marketplace.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

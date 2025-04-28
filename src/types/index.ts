@@ -34,17 +34,27 @@ export type Task = {
   platformId?: string;
 };
 
-export type LeaderboardEntry = {
+export interface LeaderboardEntry {
   address: string;
   username?: string;
-  avatarUrl?: string;
+  avatarUrl: string;
   level: number;
   tokensEarned: number;
-  insightValue: number;
   tasksCompleted: number;
+  insightValue: number;
   rank: number;
-  stage: "Spark" | "Glow" | "Blaze" | "Nova" | "Orbit";
-};
+  stage: "Spark" | "Glow" | "Blaze" | "Nova" | "Orbit"; 
+  activityBreakdown?: {
+    leetcode: number;
+    videos: number;
+    courses: number;
+    contests: number;
+    agents: number;
+  };
+  joinDate?: string;
+  lastActive?: string;
+  streak?: number;
+}
 
 export interface Agent {
   id: string;
@@ -63,5 +73,34 @@ export interface Agent {
   purchasedBy?: string[];
   dateCreated: string;
   createdBy?: string; // Added this property to match usage in firebase.ts
+  agentType: "ai" | "human"; // New field to distinguish between AI and human agents
+  // Human agent specific fields
+  experience?: string;
+  location?: string;
+  availability?: string;
+  contactMethod?: string;
+  qualifications?: string[];
 }
 
+export type ContestCategory = "coding" | "finance" | "productivity" | "learning";
+
+
+
+export interface UserActivity {
+  id: string;
+  type: "leetcode" | "video" | "course" | "contest" | "agent";
+  title: string;
+  description: string;
+  date: string;
+  tokensEarned: number;
+  details: any;
+}
+
+export interface UserTransaction {
+  id: string;
+  type: "earning" | "spending";
+  amount: number;
+  date: string;
+  description: string;
+  source: string;
+}

@@ -1,143 +1,187 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, Plus, Tag } from "lucide-react";
-import MainLayout from "@/components/layout/MainLayout";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useWeb3 } from "@/contexts/Web3Context";
+import MainLayout from "@/components/layout/MainLayout";
+import { getAllAgents } from "@/services/agentService";
+import { Agent } from "@/types";
 import AgentCard from "@/components/marketplace/AgentCard";
 import CreateAgentDialog from "@/components/marketplace/CreateAgentDialog";
-import { getAllAgents } from "@/services/agentService";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Plus, Search } from "lucide-react";
 
-// Agent category options
-const CATEGORIES = ["All", "Data Analysis", "Code Assistant", "Chatbot", "Image Generation", "Text Processing"];
+// Define the categories for each agent type
+const AI_CATEGORIES = ["All", "Data Analysis", "Code Assistant", "Chatbot", "Image Generation", "Text Processing", "Finance", "Education", "Productivity", "Health & Fitness"];
+const HUMAN_CATEGORIES = ["All", "Healthcare", "Finance", "Legal Services", "Software Development", "Marketing", "Human Resources", "Product Management", "Design", "Business Strategy", "Sales", "Customer Support", "Education", "Consulting"];
 
-const MarketplacePage = () => {
-  const [searchTerm, setSearchTerm] = useState("");
+export default function Marketplace() {
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [agents, setAgents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const { isConnected } = useWeb3();
+  const [activeTab, setActiveTab] = useState<"ai" | "human">("ai");
+  const { user } = useWeb3();
 
   // Fetch agents on component mount
   useEffect(() => {
-    const fetchAgents = async () => {
-      setLoading(true);
-      try {
-        const agentsData = await getAllAgents();
-        setAgents(agentsData);
-      } catch (error) {
-        console.error("Error fetching agents:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchAgents();
-  }, []);
+  }, [activeTab]);
 
-  // Filter agents based on search term and selected category
-  const filteredAgents = agents.filter(agent => {
-    const matchesSearch = agent.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                        agent.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "All" || agent.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
-
-  // Handler for when new agent is created
-  const handleAgentCreated = (newAgent) => {
-    setAgents(prevAgents => [newAgent, ...prevAgents]);
+  // Fetch agents from the service
+  const fetchAgents = async () => {
+    setIsLoading(true);
+    try {
+      const fetchedAgents = await getAllAgents(activeTab);
+      setAgents(fetchedAgents);
+      setFilteredAgents(fetchedAgents);
+    } catch (error) {
+      console.error("Error fetching agents:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Handler for when agent is deleted
-  const handleAgentDeleted = (agentId) => {
-    setAgents(prevAgents => prevAgents.filter(agent => agent.id !== agentId));
+  // Filter agents based on search query and category
+  useEffect(() => {
+    let result = agents;
+
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (agent) =>
+          agent.name.toLowerCase().includes(query) ||
+          agent.description.toLowerCase().includes(query) ||
+          agent.category.toLowerCase().includes(query)
+      );
+    }
+
+    // Filter by category
+    if (selectedCategory && selectedCategory !== "All") {
+      result = result.filter((agent) => agent.category === selectedCategory);
+    }
+
+    setFilteredAgents(result);
+  }, [searchQuery, selectedCategory, agents]);
+
+  // Handle agent creation
+  const handleAgentCreated = (newAgent: Agent) => {
+    setAgents((prev) => [newAgent, ...prev]);
+    fetchAgents(); // Refresh the list
+  };
+
+  // Handle agent deletion
+  const handleAgentDeleted = (agentId: string) => {
+    setAgents((prev) => prev.filter((agent) => agent.id !== agentId));
+    setFilteredAgents((prev) => prev.filter((agent) => agent.id !== agentId));
   };
 
   return (
     <MainLayout>
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">AI Agents Marketplace</h1>
-            <p className="text-gray-400 max-w-2xl">
-              Discover and purchase custom AI agents created by the community. All transactions are made using $TASK tokens.
-            </p>
-          </div>
-          
-          {isConnected && (
-            <Button 
-              onClick={() => setCreateDialogOpen(true)}
-              className="purple-gradient gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              List Your Agent
-            </Button>
-          )}
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Agent Marketplace</h1>
+          <p className="text-gray-500 mt-1">
+            Discover and purchase AI and human agents for your startup needs
+          </p>
         </div>
-
-        {/* Search and filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <div className="relative flex-grow">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              className="pl-10"
-              placeholder="Search agents..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="flex gap-2 items-center overflow-x-auto pb-2 sm:pb-0">
-            <Filter className="text-gray-400 h-4 w-4 flex-shrink-0" />
-            {CATEGORIES.map(category => (
-              <Button
-                key={category}
-                variant={selectedCategory === category ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedCategory(category)}
-                className={selectedCategory === category ? "bg-brand-purple hover:bg-brand-purple/90" : "border-brand-purple/30"}
-              >
-                {category}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        {/* Agent cards grid */}
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-purple"></div>
-          </div>
-        ) : filteredAgents.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredAgents.map(agent => (
-              <AgentCard 
-                key={agent.id} 
-                agent={agent} 
-                onDelete={handleAgentDeleted}  
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <Tag className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-bold mb-2">No agents found</h3>
-            <p className="text-gray-400 max-w-md mx-auto">
-              We couldn't find any AI agents matching your search criteria. Try adjusting your filters.
-            </p>
-          </div>
-        )}
+        <Button
+          onClick={() => setCreateDialogOpen(true)}
+          className="purple-gradient"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          List Your Agent
+        </Button>
       </div>
 
-      {/* Create Agent Dialog */}
+      <Tabs 
+        defaultValue="ai" 
+        value={activeTab} 
+        onValueChange={(value) => setActiveTab(value as "ai" | "human")}
+        className="mb-8"
+      >
+        <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+          <TabsTrigger value="ai">AI Agents</TabsTrigger>
+          <TabsTrigger value="human">Human Agents</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div className="flex flex-col md:flex-row gap-4 mb-8">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <Input
+            placeholder="Search agents..."
+            className="pl-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <Select
+          value={selectedCategory}
+          onValueChange={setSelectedCategory}
+        >
+          <SelectTrigger className="w-full md:w-[200px]">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            {(activeTab === "ai" ? AI_CATEGORIES : HUMAN_CATEGORIES).map((category) => (
+              <SelectItem key={category} value={category}>
+                {category}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center items-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-brand-purple" />
+        </div>
+      ) : filteredAgents.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredAgents.map((agent) => (
+            <AgentCard
+              key={agent.id}
+              agent={agent}
+              onDelete={handleAgentDeleted}
+              agentType={activeTab}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-20">
+          <h3 className="text-xl font-semibold mb-2">No agents found</h3>
+          <p className="text-gray-500 mb-6">
+            {searchQuery || selectedCategory !== "All"
+              ? "Try adjusting your search or filters"
+              : `No ${activeTab} agents are currently available.`}
+          </p>
+          <Button
+            onClick={() => setCreateDialogOpen(true)}
+            className="purple-gradient"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Be the first to list a{activeTab === "ai" ? "n AI" : " human"} agent
+          </Button>
+        </div>
+      )}
+
       <CreateAgentDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
         onAgentCreated={handleAgentCreated}
       />
+    </div>
     </MainLayout>
   );
-};
-
-export default MarketplacePage;
+}

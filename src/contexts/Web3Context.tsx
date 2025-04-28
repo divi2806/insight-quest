@@ -4,7 +4,7 @@ import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adap
 import { WalletProvider, ConnectionProvider, useWallet } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { toast } from 'sonner';
-import { getUserStage, getStageEmoji } from '../lib/web3Utils';
+import { getUserStage, getStageEmoji,getRandomToken,calculateInsightValue } from '../lib/web3Utils';
 import { saveUser, getUser, updateUserXP } from '@/services/firebase';
 import LevelUpDialog from '@/components/notifications/LevelUpDialog';
 import TokenService from '../lib/tokenContract';
@@ -218,7 +218,8 @@ const Web3ProviderImplementation = ({ children }: { children: ReactNode }) => {
           timeSaved: 0,
           tasksCompleted: 0,
           insightValue: 0,
-          leetcodeVerified: false
+          leetcodeVerified: false,
+          verificationToken: getRandomToken()
         };
         
         // Generate a unique avatar for the new user
