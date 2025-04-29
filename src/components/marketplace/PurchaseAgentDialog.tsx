@@ -16,8 +16,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-// Constants
-const RECEIVER_ADDRESS = '0x22254eA9fBF6bA715CdCe91Dd453704B12Aa67d4';
+// Constants - Solana Admin Receiver Address
+const RECEIVER_ADDRESS = 'EhFTWzaEXM9baSFSMM22cJiG8KjmsMLiFWi27DVc2Zq6';
 
 interface PurchaseAgentDialogProps {
   open: boolean;
@@ -35,35 +35,33 @@ const PurchaseAgentDialog: React.FC<PurchaseAgentDialogProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPurchased, setIsPurchased] = useState(false);
   const [txHash, setTxHash] = useState(null);
-  const [tokenBalance, setTokenBalance] = useState(0);
-  const { user, refreshUser } = useWeb3();
+  const { user, refreshUser, fetchTokenBalance, tokenBalance,address } = useWeb3();
+  const [currentBalance, setCurrentBalance] = useState(0);
+
+  useEffect(() => {
+    // Update local balance from context whenever tokenBalance changes
+    setCurrentBalance(parseFloat(tokenBalance));
+  }, [tokenBalance]);
 
   useEffect(() => {
     // Fetch token balance when dialog opens and user is available
-    if (open && user?.address) {
-      fetchTokenBalance();
-    }
-  }, [open, user?.address]);
-
-  const fetchTokenBalance = async () => {
-    if (!user?.address) return;
+    const fetchBalance = async () => {
+      if (open && user?.address) {
+        await fetchTokenBalance();
+      }
+    };
     
-    try {
-      const balance = await TokenService.getTokenBalance(user.address);
-      setTokenBalance(balance);
-    } catch (error) {
-      console.error("Failed to fetch token balance:", error);
-      toast.error("Failed to load your token balance");
-    }
-  };
+    fetchBalance();
+  }, [open, user?.address, fetchTokenBalance]);
 
   const handlePurchase = async () => {
-    if (!user) return;
+    if (!user || !user.address) return;
     
     setIsSubmitting(true);
     try {
-      // Use the fetched balance instead of fetching again
-      if (tokenBalance < agent.price) {
+      // Check if user has enough tokens
+      const balanceNum = parseFloat(tokenBalance);
+      if (balanceNum < agent.price) {
         toast.error("Insufficient funds", {
           description: "You don't have enough $TASK tokens to purchase this agent.",
         });
@@ -71,17 +69,21 @@ const PurchaseAgentDialog: React.FC<PurchaseAgentDialogProps> = ({
         return;
       }
       
-      // Execute token transfer to the receiver address
-      const txHash = await TokenService.enterContest(user.address, agent.price);
+      // Use the exact address from the user object without modifying case
+      const userAddress = address;
+      
+      // Execute token transfer
+      console.log("Sending address:", userAddress); 
+      const txHashLocal = await TokenService.enterContest(userAddress, agent.price);
       
       // Save transaction hash
-      setTxHash(txHash);
+      setTxHash(txHashLocal);
       
       // Save purchase to database
       await purchaseAgent(agent.id, user.id);
       
       // Add user to agent's purchasedBy list (in local state)
-      agent.purchasedBy = [...(agent.purchasedBy || []), user.address];
+      agent.purchasedBy = [...(agent.purchasedBy || []), userAddress];
       
       toast.success("Purchase successful!", {
         description: `You've successfully purchased ${agent.name}.`,
@@ -90,7 +92,7 @@ const PurchaseAgentDialog: React.FC<PurchaseAgentDialogProps> = ({
       setIsPurchased(true);
       
       // Refresh user data to update token balance
-      refreshUser();
+      await refreshUser();
       
       // Call onSuccess callback if provided
       if (onSuccess) {
@@ -106,10 +108,13 @@ const PurchaseAgentDialog: React.FC<PurchaseAgentDialogProps> = ({
     }
   };
 
-  // Get Sepolia explorer transaction URL
+  // Get Solana explorer transaction URL
   const getExplorerUrl = (hash: string) => {
-    return `https://sepolia.etherscan.io/tx/${hash}`;
+    return `https://explorer.solana.com/tx/${hash}?cluster=devnet`;
   };
+
+  // Calculate new balance after purchase for display
+  const newBalance = currentBalance - agent.price;
 
   return (
     <Dialog 
@@ -147,7 +152,7 @@ const PurchaseAgentDialog: React.FC<PurchaseAgentDialogProps> = ({
               </div>
               <div className="flex items-center justify-between">
                 <span className="font-semibold">New Balance:</span>
-                <span>{tokenBalance - agent.price} $TASK</span>
+                <span>{newBalance.toFixed(2)} $TASK</span>
               </div>
             </div>
             
@@ -159,7 +164,7 @@ const PurchaseAgentDialog: React.FC<PurchaseAgentDialogProps> = ({
                 className="flex items-center justify-center gap-2 text-blue-600 hover:text-blue-800 transition-colors mb-4"
               >
                 <ExternalLink size={16} />
-                View transaction on Sepolia Explorer
+                View transaction on Solana Explorer
               </a>
             )}
             
@@ -197,7 +202,7 @@ const PurchaseAgentDialog: React.FC<PurchaseAgentDialogProps> = ({
             <div className="space-y-4 my-6">
               <div className="flex justify-between items-center">
                 <span>Your balance:</span>
-                <span className="font-semibold">{tokenBalance} $TASK</span>
+                <span className="font-semibold">{currentBalance.toFixed(2)} $TASK</span>
               </div>
               <div className="flex justify-between items-center text-brand-purple">
                 <span>Cost:</span>
@@ -206,7 +211,7 @@ const PurchaseAgentDialog: React.FC<PurchaseAgentDialogProps> = ({
               <div className="h-px bg-gray-200 my-2" />
               <div className="flex justify-between items-center font-semibold">
                 <span>Remaining balance:</span>
-                <span>{tokenBalance - agent.price} $TASK</span>
+                <span>{newBalance.toFixed(2)} $TASK</span>
               </div>
             </div>
             <DialogFooter className="flex-col sm:flex-col gap-2">
@@ -221,14 +226,14 @@ const PurchaseAgentDialog: React.FC<PurchaseAgentDialogProps> = ({
               <Button
                 onClick={handlePurchase}
                 className="purple-gradient"
-                disabled={isSubmitting || tokenBalance < agent.price}
+                disabled={isSubmitting || currentBalance < agent.price}
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Processing...
                   </>
-                ) : tokenBalance < agent.price ? (
+                ) : currentBalance < agent.price ? (
                   <>
                     <Coins className="mr-2 h-4 w-4" />
                     Insufficient Balance
@@ -242,7 +247,6 @@ const PurchaseAgentDialog: React.FC<PurchaseAgentDialogProps> = ({
               </Button>
             </DialogFooter>
           </>
-      
         )}
       </DialogContent>
     </Dialog>
