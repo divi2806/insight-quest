@@ -10,7 +10,7 @@ import bs58 from 'bs58';
 import { Buffer } from 'buffer';
 
 // Token mint address on Solana devnet
-const TOKEN_MINT_ADDRESS = 'FGn3YwW5iMDe2Sz7ekYTV8ZvAdmQmzeSGpFEsAjHEQnm';
+const TOKEN_MINT_ADDRESS = 'tsk5ChAxhE1VMyiNK7wLY6rTuRvQsCv3btbi6Qzf9Ys';
 // Admin wallet address
 const ADMIN_ADDRESS = 'EhFTWzaEXM9baSFSMM22cJiG8KjmsMLiFWi27DVc2Zq6';
 
