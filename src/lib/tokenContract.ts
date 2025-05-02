@@ -2,7 +2,7 @@ import { Connection, PublicKey, Transaction, sendAndConfirmTransaction } from '@
 import { getAssociatedTokenAddress, createTransferInstruction, getAccount, getMint } from '@solana/spl-token';
 
 // Your custom token contract address on Solana devnet
-const TOKEN_MINT_ADDRESS = 'FGn3YwW5iMDe2Sz7ekYTV8ZvAdmQmzeSGpFEsAjHEQnm';
+const TOKEN_MINT_ADDRESS = 'tsk5ChAxhE1VMyiNK7wLY6rTuRvQsCv3btbi6Qzf9Ys';
 // The address where contest entry fees should be sent
 const RECEIVER_ADDRESS = 'EhFTWzaEXM9baSFSMM22cJiG8KjmsMLiFWi27DVc2Zq6';
 
