@@ -1,21 +1,30 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
+import { Connection, PublicKey, clusterApiUrl, Keypair, Transaction, SystemProgram } from '@solana/web3.js';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { WalletProvider, ConnectionProvider, useWallet } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { toast } from 'sonner';
-import { getUserStage, getStageEmoji,getRandomToken,calculateInsightValue } from '../lib/web3Utils';
+import { getUserStage, getStageEmoji, getRandomToken, calculateInsightValue } from '../lib/web3Utils';
 import { saveUser, getUser, updateUserXP } from '@/services/firebase';
 import LevelUpDialog from '@/components/notifications/LevelUpDialog';
 import TokenService from '../lib/tokenContract';
 import { User } from '@/types';
 import { Buffer } from 'buffer';
+import bs58 from 'bs58';
+import { createAssociatedTokenAccountInstruction, getAssociatedTokenAddress, createTransferInstruction, getMint } from '@solana/spl-token';
 // Import the styles for the wallet adapter instead of using require
 import '@solana/wallet-adapter-react-ui/styles.css';
 
 // Define the Solana devnet cluster
 const SOLANA_NETWORK = 'devnet';
 const SOLANA_ENDPOINT = clusterApiUrl(SOLANA_NETWORK);
+
+// Your custom token contract address
+const TOKEN_MINT_ADDRESS = 'FGn3YwW5iMDe2Sz7ekYTV8ZvAdmQmzeSGpFEsAjHEQnm';
+
+// Admin private key for airdrop (in production this should be handled securely)
+// Using the provided array format directly
+const ADMIN_PRIVATE_KEY = new Uint8Array([44,139,195,225,55,15,97,207,207,208,122,120,214,3,141,66,39,159,82,244,149,7,204,222,54,195,128,160,113,107,12,135,203,119,130,91,54,11,112,1,27,8,178,248,49,115,104,243,145,131,74,190,0,47,90,234,196,44,106,137,231,130,89,61]);
 
 interface Web3ContextType {
   isConnected: boolean;
@@ -29,6 +38,10 @@ interface Web3ContextType {
   addUserXP: (amount: number) => Promise<void>;
   tokenBalance: string;
   fetchTokenBalance: () => Promise<void>;
+  signatureVerified: boolean;
+  verifyingSignature: boolean;
+  verifySignature: () => Promise<void>;
+  airdropInProgress: boolean;
 }
 
 const Web3Context = createContext<Web3ContextType>({
@@ -42,7 +55,11 @@ const Web3Context = createContext<Web3ContextType>({
   updateUsername: () => {},
   addUserXP: async () => {},
   tokenBalance: "0",
-  fetchTokenBalance: async () => {}
+  fetchTokenBalance: async () => {},
+  signatureVerified: false,
+  verifyingSignature: false,
+  verifySignature: async () => {},
+  airdropInProgress: false
 });
 
 export const useWeb3 = () => useContext(Web3Context);
@@ -70,12 +87,15 @@ export const Web3ProviderWrapper = ({ children }: { children: ReactNode }) => {
 
 // Renamed the original Web3Provider to Web3ProviderImplementation for clarity
 const Web3ProviderImplementation = ({ children }: { children: ReactNode }) => {
-  const { publicKey, connected, connecting, disconnect, connect, wallet } = useWallet();
+  const { publicKey, connected, connecting, disconnect, connect, wallet, signMessage, signTransaction } = useWallet();
   const [user, setUser] = useState<User | null>(null);
   const [dailyLoginChecked, setDailyLoginChecked] = useState<boolean>(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [newLevel, setNewLevel] = useState(1);
   const [tokenBalance, setTokenBalance] = useState<string>("0");
+  const [signatureVerified, setSignatureVerified] = useState<boolean>(false);
+  const [verifyingSignature, setVerifyingSignature] = useState<boolean>(false);
+  const [airdropInProgress, setAirdropInProgress] = useState<boolean>(false);
 
   // Function to fetch the token balance
   const fetchTokenBalance = async (): Promise<void> => {
@@ -98,6 +118,187 @@ const Web3ProviderImplementation = ({ children }: { children: ReactNode }) => {
     // Generate a unique seed based on the user's address to ensure consistency
     const seed = address.slice(0, 8); // Use part of the address as seed
     return `https://api.dicebear.com/6.x/avataaars/svg?seed=${seed}`;
+  };
+
+  // Function to verify wallet signature
+  const verifySignature = async (): Promise<void> => {
+    if (!publicKey || !connected || !signMessage || !user) {
+      toast.error("Wallet not connected properly");
+      return;
+    }
+
+    try {
+      setVerifyingSignature(true);
+      
+      // Create a message for the user to sign
+      const message = new TextEncoder().encode(
+        `Welcome to InsightQuest! Please sign this message to verify your wallet ownership. Verification time: ${Date.now()}`
+      );
+      
+      // Ask the user to sign the message
+      const signature = await signMessage(message);
+      
+      // Verification successful
+      setSignatureVerified(true);
+      
+      // Update user record with verification status
+      const updatedUser = {
+        ...user,
+        signatureVerified: true
+      };
+      
+      await saveUser(updatedUser);
+      setUser(updatedUser);
+      
+      toast.success("Signature verified successfully!");
+      
+      // Check if tokens have been airdropped before
+      if (!user.hasReceivedAirdrop) {
+        // Proceed with airdrop only if not received before
+        await airdropTokens();
+      } else {
+        // Just fetch the balance if already received airdrop
+        await fetchTokenBalance();
+      }
+    } catch (error) {
+      console.error("Error verifying signature:", error);
+      toast.error("Signature verification failed. Please try again.");
+    } finally {
+      setVerifyingSignature(false);
+    }
+  };
+
+  // Function to airdrop tokens to the user
+  const airdropTokens = async (): Promise<void> => {
+    if (!publicKey || !connected || !user) {
+      toast.error("Wallet not connected");
+      return;
+    }
+
+    // Check if user has already received airdrop
+    if (user.hasReceivedAirdrop) {
+      toast.info("You've already received your TASK token airdrop!");
+      return;
+    }
+
+    try {
+      setAirdropInProgress(true);
+      toast.info("Preparing to airdrop 200 TASK tokens...");
+
+      const connection = new Connection(SOLANA_ENDPOINT, 'confirmed');
+      const userPublicKey = publicKey;
+      const mintPublicKey = new PublicKey(TOKEN_MINT_ADDRESS);
+
+      // Create admin keypair from the provided private key (Uint8Array)
+      const adminKeypair = Keypair.fromSecretKey(ADMIN_PRIVATE_KEY);
+      
+      console.log("Admin public key:", adminKeypair.publicKey.toString());
+      
+      // Get the associated token accounts for admin and user
+      const adminTokenAccount = await getAssociatedTokenAddress(
+        mintPublicKey,
+        adminKeypair.publicKey
+      );
+      
+      // Check if admin token account exists and has sufficient balance
+      try {
+        const adminTokenInfo = await connection.getTokenAccountBalance(adminTokenAccount);
+        console.log("Admin token balance:", adminTokenInfo.value.uiAmount);
+        
+        if (!adminTokenInfo.value.uiAmount || adminTokenInfo.value.uiAmount < 200) {
+          throw new Error("Admin account has insufficient token balance");
+        }
+      } catch (err) {
+        console.error("Error checking admin token account:", err);
+        toast.error("Admin token account issue. Please contact support.");
+        setAirdropInProgress(false);
+        return;
+      }
+      
+      const userTokenAccount = await getAssociatedTokenAddress(
+        mintPublicKey,
+        userPublicKey
+      );
+      
+      // Check if user's token account exists
+      let userTokenAccountExists = false;
+      try {
+        const accountInfo = await connection.getAccountInfo(userTokenAccount);
+        userTokenAccountExists = accountInfo !== null;
+      } catch (err) {
+        console.log("User token account does not exist yet");
+        userTokenAccountExists = false;
+      }
+      
+      // Create transaction
+      const transaction = new Transaction();
+      
+      // If user token account doesn't exist, add instruction to create it
+      if (!userTokenAccountExists) {
+        console.log("Creating user token account...");
+        const createUserAccountInstruction = createAssociatedTokenAccountInstruction(
+          adminKeypair.publicKey, // payer
+          userTokenAccount, // associated token account address
+          userPublicKey, // owner
+          mintPublicKey // token mint
+        );
+        transaction.add(createUserAccountInstruction);
+      }
+      
+      // Get mint info to calculate amount with proper decimals
+      const mintInfo = await getMint(connection, mintPublicKey);
+      const amount = 200 * Math.pow(10, mintInfo.decimals); // 200 tokens
+      
+      // Create transfer instruction
+      const transferInstruction = createTransferInstruction(
+        adminTokenAccount,
+        userTokenAccount,
+        adminKeypair.publicKey,
+        BigInt(amount)
+      );
+      
+      // Add the transfer instruction
+      transaction.add(transferInstruction);
+      
+      // Set recent blockhash and fee payer
+      transaction.feePayer = adminKeypair.publicKey;
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      
+      // Sign the transaction with admin keypair
+      transaction.sign(adminKeypair);
+      
+      // Send the signed transaction
+      const signature = await connection.sendRawTransaction(transaction.serialize());
+      
+      // Wait for confirmation
+      await connection.confirmTransaction(signature);
+      
+      console.log("Airdrop successful:", signature);
+      toast.success("Congratulations! 200 TASK tokens have been airdropped to your wallet.");
+      
+      // Update token balance
+      await fetchTokenBalance();
+      
+      // Update user record with airdrop info
+      if (user) {
+        const updatedUser = {
+          ...user,
+          tokens: Number(tokenBalance) + 200,
+          tokensEarned: (user.tokensEarned || 0) + 200,
+          hasReceivedAirdrop: true,
+          airdropTxSignature: signature
+        };
+        await saveUser(updatedUser);
+        setUser(updatedUser);
+      }
+      
+    } catch (error) {
+      console.error("Error during token airdrop:", error);
+      toast.error("Failed to airdrop tokens. Please try again later.");
+    } finally {
+      setAirdropInProgress(false);
+    }
   };
 
   const checkDailyLogin = async (currentUser: User) => {
@@ -194,6 +395,7 @@ const Web3ProviderImplementation = ({ children }: { children: ReactNode }) => {
     } else {
       setUser(null);
       setTokenBalance("0");
+      setSignatureVerified(false);
     }
   }, [connected, publicKey]);
 
@@ -219,7 +421,9 @@ const Web3ProviderImplementation = ({ children }: { children: ReactNode }) => {
           tasksCompleted: 0,
           insightValue: 0,
           leetcodeVerified: false,
-          verificationToken: getRandomToken()
+          verificationToken: getRandomToken(),
+          signatureVerified: false,
+          hasReceivedAirdrop: false
         };
         
         // Generate a unique avatar for the new user
@@ -239,6 +443,14 @@ const Web3ProviderImplementation = ({ children }: { children: ReactNode }) => {
         stage: getUserStage(fbUser.level) as User['stage']
       };
       
+      // Check if user has already verified their signature
+      if (fbUser.signatureVerified) {
+        setSignatureVerified(true);
+        
+        // Fetch token balance since we're already verified
+        setTimeout(() => fetchTokenBalance(), 500);
+      }
+      
       // Check for daily login if not already checked
       if (!dailyLoginChecked) {
         fbUser = await checkDailyLogin(fbUser);
@@ -247,17 +459,11 @@ const Web3ProviderImplementation = ({ children }: { children: ReactNode }) => {
       
       setUser(fbUser);
       
-      // Fetch token balance after user is set
-      await fetchTokenBalance();
-      
-      // Show welcome back toast with stage info if returning user
-      if (!isNewUser && fbUser.level > 1) {
-        const emoji = getStageEmoji(fbUser.stage);
-        toast.success(`Welcome back to InsightQuest!`, {
-          description: `You're currently at the ${emoji} ${fbUser.stage} stage. Keep going!`
-        });
+      // Show wallet connected notification with appropriate message
+      if (fbUser.signatureVerified) {
+        toast.success('Wallet connected!');
       } else {
-        toast.success('Wallet connected successfully!');
+        toast.success('Wallet connected! Please verify signature to continue.');
       }
     } catch (error) {
       console.error("Error handling wallet connection:", error);
@@ -284,6 +490,7 @@ const Web3ProviderImplementation = ({ children }: { children: ReactNode }) => {
     disconnect();
     setUser(null);
     setTokenBalance("0");
+    setSignatureVerified(false);
     toast.info('Wallet disconnected');
   };
   
@@ -359,6 +566,8 @@ const Web3ProviderImplementation = ({ children }: { children: ReactNode }) => {
             tasksCompleted: 0,
             insightValue: 0,
             leetcodeVerified: false,
+            signatureVerified: false,
+            hasReceivedAirdrop: false,
             avatarUrl: generateAvatarUrl(address)
           };
           
@@ -377,10 +586,15 @@ const Web3ProviderImplementation = ({ children }: { children: ReactNode }) => {
             stage: getUserStage(refreshedUser.level) as User['stage']
           };
           
+          // Set signature verified state based on user data
+          setSignatureVerified(refreshedUser.signatureVerified || false);
+          
           setUser(refreshedUser);
           
-          // Also refresh token balance
-          await fetchTokenBalance();
+          // Also refresh token balance if signature is verified
+          if (refreshedUser.signatureVerified) {
+            await fetchTokenBalance();
+          }
         }
       } catch (error) {
         console.error("Error refreshing user:", error);
@@ -388,9 +602,9 @@ const Web3ProviderImplementation = ({ children }: { children: ReactNode }) => {
     }
   };
   
-  // Check for token balance updates periodically
+  // Check for token balance updates periodically if signature is verified
   useEffect(() => {
-    if (connected && publicKey) {
+    if (connected && publicKey && signatureVerified) {
       // Initial fetch
       fetchTokenBalance();
       
@@ -402,7 +616,7 @@ const Web3ProviderImplementation = ({ children }: { children: ReactNode }) => {
       // Clean up interval
       return () => clearInterval(intervalId);
     }
-  }, [connected, publicKey]);
+  }, [connected, publicKey, signatureVerified]);
   
   return (
     <Web3Context.Provider 
@@ -417,7 +631,11 @@ const Web3ProviderImplementation = ({ children }: { children: ReactNode }) => {
         updateUsername,
         addUserXP,
         tokenBalance,
-        fetchTokenBalance
+        fetchTokenBalance,
+        signatureVerified,
+        verifyingSignature,
+        verifySignature,
+        airdropInProgress
       }}
     >
       {children}
